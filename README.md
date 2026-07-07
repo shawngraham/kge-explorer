@@ -3,9 +3,8 @@
 
 A **Knowledge Graph Embedding (KGE) Engine and Latent Space Explorer** running 100% locally in your browser. It allows users to train, visualize, and query embedding models on custom or preloaded demonstration datasets, perform vector arithmetic to generate synthetic entities, detect relational anomalies, and interpret latent structures using optional server-side LLMs or local models.
 
-<img width="601" height="230" alt="Screenshot 2026-07-07 at 3 34 25 PM" src="https://github.com/user-attachments/assets/b11aec2a-2dc8-43bc-80ca-941de1ec4938" />
+<img width="800"  alt="Screenshot 2026-07-07 at 3 39 00 PM" src="https://github.com/user-attachments/assets/3f1e4212-1879-49c4-8691-5d7763d37b8a" />
 
-_A panel from the Explorer, replicating a finding from our 2023 [paper](https://www.cambridge.org/core/journals/advances-in-archaeological-practice/article/relationship-prediction-in-a-knowledge-graph-embedding-model-of-the-illicit-antiquities-trade/9B802F4BEFEA325D3221E39BCE4F3A63)._
 
 ---
 
@@ -134,3 +133,7 @@ In the **Latent Space KGE Explorer** UI:
 3.  Set the **Ollama Endpoint** to your local host (usually `http://localhost:11434` or `http://127.0.0.1:11434`).
 4.  Provide the exact **Ollama Model** name you downloaded (e.g., `gemma2` or `llama3`).
 5.  Click **Apply Config** to route all interpretation and latent explanation queries straight to your local hardware.
+
+<img width="601" alt="Screenshot 2026-07-07 at 3 34 25 PM" src="https://github.com/user-attachments/assets/b11aec2a-2dc8-43bc-80ca-941de1ec4938" />
+
+_A panel from the Explorer, replicating a finding from our 2023 [paper](https://www.cambridge.org/core/journals/advances-in-archaeological-practice/article/relationship-prediction-in-a-knowledge-graph-embedding-model-of-the-illicit-antiquities-trade/9B802F4BEFEA325D3221E39BCE4F3A63)._

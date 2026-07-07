@@ -1,7 +1,11 @@
-<img width="802" height="540" alt="Screenshot 2026-07-07 at 3 34 25 PM" src="https://github.com/user-attachments/assets/b11aec2a-2dc8-43bc-80ca-941de1ec4938" />
+
 # Latent Space Knowledge Graph Embedding (KGE) Explorer
 
 A **Knowledge Graph Embedding (KGE) Engine and Latent Space Explorer** running 100% locally in your browser. It allows users to train, visualize, and query embedding models on custom or preloaded demonstration datasets, perform vector arithmetic to generate synthetic entities, detect relational anomalies, and interpret latent structures using optional server-side LLMs or local models.
+
+<img width="601" height="230" alt="Screenshot 2026-07-07 at 3 34 25 PM" src="https://github.com/user-attachments/assets/b11aec2a-2dc8-43bc-80ca-941de1ec4938" />
+
+_A panel from the Explorer, replicating a finding from our 2023 [paper](https://www.cambridge.org/core/journals/advances-in-archaeological-practice/article/relationship-prediction-in-a-knowledge-graph-embedding-model-of-the-illicit-antiquities-trade/9B802F4BEFEA325D3221E39BCE4F3A63)._
 
 ---
 

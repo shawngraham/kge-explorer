@@ -556,12 +556,18 @@ export class KGEEngine {
       const start = e * size;
       let sumSq = 0;
       for (let i = 0; i < size; i++) {
-        sumSq += this.entityEmbeddings[start + i] * this.entityEmbeddings[start + i];
+        let val = this.entityEmbeddings[start + i];
+        if (isNaN(val) || !isFinite(val)) {
+          val = (Math.random() * 2 - 1) * 0.01;
+          this.entityEmbeddings[start + i] = val;
+        }
+        sumSq += val * val;
       }
       const norm = Math.sqrt(sumSq);
-      if (norm > 1.0) { // Limit embeddings to unit ball
+      if (norm > 1.0 || isNaN(norm) || !isFinite(norm)) { // Limit embeddings to unit ball
+        const div = norm > 1e-8 ? norm : 1.0;
         for (let i = 0; i < size; i++) {
-          this.entityEmbeddings[start + i] /= norm;
+          this.entityEmbeddings[start + i] /= div;
         }
       }
     }
@@ -569,6 +575,7 @@ export class KGEEngine {
 
   // Normalize relation vectors to unit sphere (keeps bilinear and translation models stable)
   normalizeRelations(modelType: KGEModelType, dim: number) {
+    if (modelType === 'rotatE') return; // RotatE relations are phase angles, not bounded vectors!
     const numRel = this.relations.length;
     const size = modelType === 'complEx' ? dim * 2 : dim;
     
@@ -576,12 +583,18 @@ export class KGEEngine {
       const start = r * size;
       let sumSq = 0;
       for (let i = 0; i < size; i++) {
-        sumSq += this.relationEmbeddings[start + i] * this.relationEmbeddings[start + i];
+        let val = this.relationEmbeddings[start + i];
+        if (isNaN(val) || !isFinite(val)) {
+          val = (Math.random() * 2 - 1) * 0.01;
+          this.relationEmbeddings[start + i] = val;
+        }
+        sumSq += val * val;
       }
       const norm = Math.sqrt(sumSq);
-      if (norm > 1.0) { // Limit embeddings to unit ball
+      if (norm > 1.0 || isNaN(norm) || !isFinite(norm)) { // Limit embeddings to unit ball
+        const div = norm > 1e-8 ? norm : 1.0;
         for (let i = 0; i < size; i++) {
-          this.relationEmbeddings[start + i] /= norm;
+          this.relationEmbeddings[start + i] /= div;
         }
       }
     }
@@ -688,6 +701,9 @@ export class KGEEngine {
             const nh = this.getEntityVector(negHIdx, dim);
             const nt = this.getEntityVector(negTIdx, dim);
 
+            // Clip raw gradient values to prevent mathematical explosion in similarity-based/bilinear KGEs
+            const clip = (val: number) => Math.max(-1.0, Math.min(1.0, val));
+
             for (let i = 0; i < dim; i++) {
               const h_val = h[i];
               const r_val = r[i];
@@ -697,15 +713,15 @@ export class KGEEngine {
 
               // pos score = h * r * t
               // Gradient wrt h: -r*t, wrt r: -h*t, wrt t: -h*r
-              h[i] += lr * (r_val * t_val);
-              r[i] += lr * (h_val * t_val);
-              t[i] += lr * (h_val * r_val);
+              h[i] += lr * clip(r_val * t_val);
+              r[i] += lr * clip(h_val * t_val);
+              t[i] += lr * clip(h_val * r_val);
 
               // neg score = nh * r * nt
               // Gradient wrt nh: r*nt, wrt r: nh*nt, wrt nt: nh*r
-              nh[i] -= lr * (r_val * nt_val);
-              r[i] -= lr * (nh_val * nt_val);
-              nt[i] -= lr * (nh_val * r_val);
+              nh[i] -= lr * clip(r_val * nt_val);
+              r[i] -= lr * clip(nh_val * nt_val);
+              nt[i] -= lr * clip(nh_val * r_val);
             }
             
           } else if (modelType === 'complEx') {
@@ -715,6 +731,9 @@ export class KGEEngine {
             
             const nh = this.getEntityVector(negHIdx, dim * 2);
             const nt = this.getEntityVector(negTIdx, dim * 2);
+
+            // Clip raw gradient values to prevent mathematical explosion in complex space KGEs
+            const clip = (val: number) => Math.max(-1.0, Math.min(1.0, val));
 
             for (let i = 0; i < dim; i++) {
               const h_re = h[i];
@@ -737,12 +756,12 @@ export class KGEEngine {
               const g_t_re = h_re * r_re - h_im * r_im;
               const g_t_im = h_im * r_re + h_re * r_im;
 
-              h[i] += lr * g_h_re;
-              h[dim + i] += lr * g_h_im;
-              r[i] += lr * g_r_re;
-              r[dim + i] += lr * g_r_im;
-              t[i] += lr * g_t_re;
-              t[dim + i] += lr * g_t_im;
+              h[i] += lr * clip(g_h_re);
+              h[dim + i] += lr * clip(g_h_im);
+              r[i] += lr * clip(g_r_re);
+              r[dim + i] += lr * clip(g_r_im);
+              t[i] += lr * clip(g_t_re);
+              t[dim + i] += lr * clip(g_t_im);
 
               // Negative triple gradients
               const gn_h_re = r_re * nt_re + r_im * nt_im;
@@ -752,12 +771,12 @@ export class KGEEngine {
               const gn_t_re = nh_re * r_re - nh_im * r_im;
               const gn_t_im = nh_im * r_re + nh_re * r_im;
 
-              nh[i] -= lr * gn_h_re;
-              nh[dim + i] -= lr * gn_h_im;
-              r[i] -= lr * gn_r_re;
-              r[dim + i] -= lr * gn_r_im;
-              nt[i] -= lr * gn_t_re;
-              nt[dim + i] -= lr * gn_t_im;
+              nh[i] -= lr * clip(gn_h_re);
+              nh[dim + i] -= lr * clip(gn_h_im);
+              r[i] -= lr * clip(gn_r_re);
+              r[dim + i] -= lr * clip(gn_r_im);
+              nt[i] -= lr * clip(gn_t_re);
+              nt[dim + i] -= lr * clip(gn_t_im);
             }
             
           } else if (modelType === 'rotatE') {
@@ -1245,35 +1264,13 @@ export class KGEEngine {
         }
         dist = Math.sqrt(sumSq);
       } else if (modelType === 'distMult') {
-        const h = this.getEntityVector(hIdx, dim);
-        const r = this.getRelationVector(rIdx, dim);
-        const t = this.getEntityVector(tIdx, dim);
-        let sumSq = 0;
-        for (let i = 0; i < dim; i++) {
-          const diff = h[i] * r[i] - t[i];
-          sumSq += diff * diff;
-        }
-        dist = Math.sqrt(sumSq);
+        const score = this.scoreTriple(hIdx, rIdx, tIdx, 'distMult', dim);
+        // Incompatibility metric is negative similarity: lower/negative similarity means higher violation
+        dist = -score;
       } else if (modelType === 'complEx') {
-        const h = this.getEntityVector(hIdx, dim * 2);
-        const r = this.getRelationVector(rIdx, dim * 2);
-        const t = this.getEntityVector(tIdx, dim * 2);
-        let sumSq = 0;
-        for (let i = 0; i < dim; i++) {
-          const h_re = h[i];
-          const h_im = h[dim + i];
-          const r_re = r[i];
-          const r_im = r[dim + i];
-          const t_re = t[i];
-          const t_im = t[dim + i];
-
-          const rot_re = h_re * r_re - h_im * r_im;
-          const rot_im = h_re * r_im + h_im * r_re;
-          const diff_re = rot_re - t_re;
-          const diff_im = rot_im - t_im;
-          sumSq += (diff_re * diff_re + diff_im * diff_im);
-        }
-        dist = Math.sqrt(sumSq);
+        const score = this.scoreTriple(hIdx, rIdx, tIdx, 'complEx', dim);
+        // Incompatibility metric is negative similarity: lower/negative similarity means higher violation
+        dist = -score;
       } else if (modelType === 'rotatE') {
         const h = this.getEntityVector(hIdx, dim * 2);
         const r_theta = this.getRelationVector(rIdx, dim);

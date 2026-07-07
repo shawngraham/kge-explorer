@@ -22,6 +22,7 @@ export default function App() {
   const [customTriples, setCustomTriples] = useState<Triple[] | null>(null);
   const [customName, setCustomName] = useState<string>('');
   const [customDesc, setCustomDesc] = useState<string>('');
+  const [datasetDescOverride, setDatasetDescOverride] = useState<string>('');
   const [csvRaw, setCsvRaw] = useState<string>('');
 
   // CSV Configuration States
@@ -328,6 +329,11 @@ export default function App() {
     setGlobalAnalysisText('');
   }, [activeDataset, uniqueEntities, uniqueRelations]);
 
+  // Sync datasetDescOverride when active dataset changes
+  useEffect(() => {
+    setDatasetDescOverride(activeDataset.description);
+  }, [activeDataset.id, activeDataset.description]);
+
   // Handle local nearest neighbors
   const nearestNeighbors = useMemo(() => {
     if (!isModelTrainedForSelectedConfig || isTraining || !selectedNode || !engineInstance) return [];
@@ -581,6 +587,14 @@ export default function App() {
     setSelectedTripleExplanation({ sub, rel, obj, text: `Consulting ${llmConfig.provider === 'gemini' ? 'Gemini' : llmConfig.provider === 'ollama' ? 'Ollama' : 'OpenAI'} model for latent space analysis...` });
     
     try {
+      // Find up to 15 ground truth facts connected to the subject, and up to 15 for the object to ground the LLM's explanation
+      const subjectNeighborhood = activeDataset.triples
+        .filter(t => t.sub === sub || t.obj === sub)
+        .slice(0, 15);
+      const objectNeighborhood = activeDataset.triples
+        .filter(t => t.sub === obj || t.obj === obj)
+        .slice(0, 15);
+
       const response = await fetch('/api/gemini/interpret-relationship', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -591,7 +605,9 @@ export default function App() {
           score,
           confidence,
           modelType,
-          datasetDescription: activeDataset.description,
+          datasetDescription: datasetDescOverride || activeDataset.description,
+          subjectNeighborhood,
+          objectNeighborhood,
           llmConfig
         })
       });
@@ -677,7 +693,7 @@ export default function App() {
           sourceEntities: latentSources.filter(s => s !== ''),
           arithmeticOps: latentOps,
           predictedRelations: latentRelations,
-          datasetDescription: activeDataset.description,
+          datasetDescription: datasetDescOverride || activeDataset.description,
           llmConfig
         })
       });
@@ -716,7 +732,7 @@ export default function App() {
         body: JSON.stringify({
           stats,
           modelType,
-          datasetDescription: activeDataset.description,
+          datasetDescription: datasetDescOverride || activeDataset.description,
           llmConfig
         })
       });
@@ -884,6 +900,20 @@ export default function App() {
                   ))}
                   {customTriples && <option value="custom">★ {customName}</option>}
                 </select>
+              </div>
+
+              {/* Editable Domain Context for LLM */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] uppercase tracking-wider text-slate-400 font-mono">Domain Context (for LLM)</label>
+                  <span className="text-[9px] text-slate-400 font-sans italic">Editable</span>
+                </div>
+                <textarea
+                  value={datasetDescOverride}
+                  onChange={(e) => setDatasetDescOverride(e.target.value)}
+                  placeholder="Describe the domain of this knowledge graph so the LLM has context for explanations..."
+                  className="w-full h-[65px] bg-slate-50 border border-slate-200 focus:border-indigo-500 hover:border-slate-300 rounded-lg p-2 text-[11px] text-slate-700 focus:outline-none resize-none transition-all"
+                />
               </div>
 
               {/* CSV Manual Upload Widget */}
@@ -1267,55 +1297,56 @@ export default function App() {
                     <div className="flex flex-col gap-1">
                       <h3 className="text-sm font-semibold text-slate-800">Triple Completer / Link Prediction</h3>
                       <p className="text-xs text-slate-500">
-                        Query the high-dimensional geometry to complete a triple. Select a subject and relation, leaving the object empty <b className="text-indigo-600">(?, r, t)</b> or <b className="text-indigo-600">(h, r, ?)</b> to predict the top candidates.
+                        Select a subject or object and relation, leaving the other blank; or select subject and object, leaving the relation empty <b className="text-indigo-600">(h, ?, t)</b> to predict the relationships.
                       </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                      {/* Subject select */}
-                      <div className="flex flex-col gap-1.5 font-mono text-xs">
-                        <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">SUBJECT (h)</span>
-                        <select
-                          value={predSub}
-                          onChange={(e) => setPredSub(e.target.value)}
-                          className="bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-indigo-550 text-slate-700"
-                        >
-                          <option value="">[Any Subject / Predict (?)]</option>
-                          {uniqueEntities.map(e => (
-                            <option key={e} value={e}>{e}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Relation select */}
-                      <div className="flex flex-col gap-1.5 font-mono text-xs">
-                        <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">RELATION (r)</span>
-                        <select
-                          value={predRel}
-                          onChange={(e) => setPredRel(e.target.value)}
-                          className="bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-indigo-550 text-indigo-600 font-bold"
-                        >
-                          {uniqueRelations.map(r => (
-                            <option key={r} value={r}>{r}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Object select */}
-                      <div className="flex flex-col gap-1.5 font-mono text-xs">
-                        <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">OBJECT (t)</span>
-                        <select
-                          value={predObj}
-                          onChange={(e) => setPredObj(e.target.value)}
-                          className="bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-indigo-550 text-slate-700"
-                        >
-                          <option value="">[Predict (?)]</option>
-                          {uniqueEntities.map(e => (
-                            <option key={e} value={e}>{e}</option>
-                          ))}
-                        </select>
-                      </div>
+                    {/* Subject select */}
+                    <div className="flex flex-col gap-1.5 font-mono text-xs">
+                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">SUBJECT (h)</span>
+                      <select
+                        value={predSub}
+                        onChange={(e) => setPredSub(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-indigo-550 text-slate-700"
+                      >
+                        <option value="">[Any Subject / Predict (?)]</option>
+                        {uniqueEntities.map(e => (
+                          <option key={e} value={e}>{e}</option>
+                        ))}
+                      </select>
                     </div>
+
+                    {/* Relation select */}
+                    <div className="flex flex-col gap-1.5 font-mono text-xs">
+                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">RELATION (r)</span>
+                      <select
+                        value={predRel}
+                        onChange={(e) => setPredRel(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-indigo-550 text-indigo-600 font-bold"
+                      >
+                        <option value="">[Predict Relation (?)]</option>
+                        {uniqueRelations.map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Object select */}
+                    <div className="flex flex-col gap-1.5 font-mono text-xs">
+                      <span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">OBJECT (t)</span>
+                      <select
+                        value={predObj}
+                        onChange={(e) => setPredObj(e.target.value)}
+                        className="bg-slate-50 border border-slate-200 rounded-lg p-2 focus:outline-none focus:border-indigo-550 text-slate-700"
+                      >
+                        <option value="">[Predict (?)]</option>
+                        {uniqueEntities.map(e => (
+                          <option key={e} value={e}>{e}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
                     <div className="flex justify-end mt-1">
                       <button
@@ -1404,17 +1435,17 @@ export default function App() {
                                   onClick={() => handleExplainRelation(dt.sub, dt.rel, dt.obj, dt.score, dt.confidence)}
                                   className="self-end text-[10px] text-indigo-600 hover:text-indigo-700 font-semibold uppercase flex items-center gap-1 cursor-pointer"
                                 >
-                                  EXPLAIN WITH GEMINI ➔
+                                  EXPLAIN WITH LLM ➔
                                 </button>
                               </div>
                             ))}
                           </div>
                         </div>
 
-                        {/* Gemini Explanation Detail view */}
+                        {/* LLM Explanation Detail view */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/30 flex flex-col min-h-[300px]">
                           <div className="bg-slate-50 text-slate-550 px-4 py-2.5 border-b border-slate-200 font-mono text-xs font-bold flex items-center justify-between text-[10px] tracking-wider uppercase">
-                            <span>GEMINI LATENT EXPLANATION</span>
+                            <span>LLM LATENT EXPLANATION</span>
                             {isGeneratingExplanation && <span className="animate-pulse text-indigo-600">ANALYZING...</span>}
                           </div>
                           
@@ -1434,7 +1465,7 @@ export default function App() {
                             ) : (
                               <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 font-mono text-xs p-4 gap-2">
                                 <Info className="h-6 w-6 text-slate-350" />
-                                Select a latent relationship on the left and click "Explain with Gemini" to get AI insight on what this hidden relationship represents.
+                                Select a latent relationship on the left and click "Explain with LLM" to get AI insight on what this hidden relationship represents.
                               </div>
                             )}
                           </div>
@@ -1564,7 +1595,7 @@ export default function App() {
                                   onClick={handleExplainLatentEntity}
                                   disabled={isGeneratingLatentConcept}
                                   className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold uppercase flex items-center justify-center gap-1 transition-all cursor-pointer text-[11px]"
-                                  title="Explain Concept with Gemini"
+                                  title="Explain Concept with LLM"
                                 >
                                   <Sparkles className="h-4 w-4" /> EXPLAIN
                                 </button>
@@ -1750,11 +1781,11 @@ export default function App() {
                             );
                           })()}
 
-                          {/* Gemini analysis text */}
+                          {/* LLM analysis text */}
                           {latentAnalysis && (
                             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 max-h-[220px] overflow-y-auto">
                               <span className="text-[10px] text-indigo-600 font-bold block mb-2 flex items-center gap-1 tracking-wider uppercase">
-                                <Sparkles className="h-3.5 w-3.5" /> GEMINI CONCEPTUAL SYNTHESIS
+                                <Sparkles className="h-3.5 w-3.5" /> LLM CONCEPTUAL SYNTHESIS
                               </span>
                               <div className="text-[11px] whitespace-pre-line text-slate-650 font-sans leading-relaxed">
                                 {latentAnalysis}
@@ -1853,7 +1884,7 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* Global analysis summary with Gemini */}
+                        {/* Global analysis summary with LLM */}
                         <div className="border border-slate-200 bg-slate-50/30 rounded-xl p-4 flex flex-col gap-3">
                           <div className="flex items-center justify-between">
                             <span className="font-bold text-slate-500 text-[10px] tracking-wider uppercase">GLOBAL TOPOLOGY ASSESSMENT</span>
@@ -1862,7 +1893,7 @@ export default function App() {
                               disabled={isGeneratingGlobalAnalysis}
                               className="px-3 py-1 bg-white border border-slate-200 hover:bg-slate-50 rounded text-[10px] font-bold text-indigo-600 shadow-xs transition-all uppercase cursor-pointer"
                             >
-                              COMPILE WITH GEMINI
+                              COMPILE WITH LLM
                             </button>
                           </div>
 
@@ -1874,7 +1905,7 @@ export default function App() {
                             ) : (
                               <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-[10px] py-4 gap-2">
                                 <FileText className="h-6 w-6 text-slate-350" />
-                                Click "Compile with Gemini" to analyze structural metrics, convergence loss, and relational traits of the trained KGE space.
+                                Click "Compile with LLM" to analyze structural metrics, convergence loss, and relational traits of the trained KGE space.
                               </div>
                             )}
                           </div>
@@ -1897,9 +1928,9 @@ export default function App() {
                                 ) : modelType === 'transE' ? (
                                   <span>{"Metric: d_r(h, t) = ||h + r - t|| (Translational Shifts)"}</span>
                                 ) : modelType === 'complEx' ? (
-                                  <span>{"Metric: d_r(h, t) = ||h ∘ r - t|| (Hermitian Multiplication)"}</span>
+                                  <span>{"Metric: -f_r(h, t) = -Re(<h, r, conj(t)>) (Complex Hermitian Incompatibility)"}</span>
                                 ) : (
-                                  <span>{"Metric: d_r(h, t) = ||h ∘ r - t|| (Bilinear Reconstruction)"}</span>
+                                  <span>{"Metric: -f_r(h, t) = -<h, r, t> (Bilinear Incompatibility)"}</span>
                                 )}
                               </span>
                             </div>
@@ -1950,7 +1981,11 @@ export default function App() {
                           <span className="font-bold text-slate-800 mr-1 flex items-center gap-1">
                             <Info className="h-3.5 w-3.5 text-indigo-500 inline" /> Mathematical Hypothesis:
                           </span>
-                          {"Anomalies represent triples that fail to satisfy the learned geometric/algebraic transitions of the model. If a trained relation represents rotation (RotatE) or translation (TransE), a high violation distance (d >> mean) implies the facts are incompatible with the global embedding regularities."}
+                          {modelType === 'transE' || modelType === 'rotatE' ? (
+                            <span>{"Anomalies represent triples that fail to satisfy the learned geometric transitions of the model. If a trained relation represents translation (TransE) or rotation (RotatE), a high violation distance (d >> mean) implies the facts are structurally incompatible with the global spatial regularities."}</span>
+                          ) : (
+                            <span>{"Anomalies represent triples that fail to satisfy the learned similarity/plausibility scores. For bilinear models (DistMult, ComplEx), true relationships yield highly positive scores; a high incompatibility metric (negative score >> mean) flags triples that violate the model's multiplicative association rules."}</span>
+                          )}
                         </div>
 
                         {/* Triple table list */}
@@ -2003,7 +2038,7 @@ export default function App() {
                                     </div>
 
                                     <div className="flex items-center gap-4 text-[10px] text-slate-450">
-                                      <span>Distance: <b className="text-slate-650 font-bold">{item.distance.toFixed(4)}</b></span>
+                                      <span>{modelType === 'transE' || modelType === 'rotatE' ? 'Distance' : 'Incompatibility'}: <b className="text-slate-650 font-bold">{item.distance.toFixed(4)}</b></span>
                                       <span>z-Score: <b className={`font-bold ${item.isAnomaly ? 'text-rose-600' : 'text-slate-600'}`}>{item.zScore > 0 ? '+' : ''}{item.zScore.toFixed(2)}</b></span>
                                       
                                       <div className="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">

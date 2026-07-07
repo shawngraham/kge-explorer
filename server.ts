@@ -192,15 +192,45 @@ function formatLLMError(error: any, defaultText: string): string {
 
 app.post('/api/gemini/interpret-relationship', async (req, res) => {
   try {
-    const { sub, rel, obj, score, confidence, modelType, datasetDescription, llmConfig } = req.body;
+    const { sub, rel, obj, score, confidence, modelType, datasetDescription, subjectNeighborhood, objectNeighborhood, llmConfig } = req.body;
     
     if (!sub || !rel || !obj) {
       return res.status(400).json({ error: 'Missing triple elements (subject, relation, object).' });
     }
 
-    const systemInstruction = "You are an expert in Knowledge Graph Embeddings (KGE) and data science.";
+    let neighborhoodContext = '';
+    if (subjectNeighborhood && subjectNeighborhood.length > 0) {
+      neighborhoodContext += `\nExisting ground-truth connections involving Subject "${sub}" in the original graph:\n` +
+        subjectNeighborhood.map((t: any) => `- (${t.sub}, ${t.rel}, ${t.obj})`).join('\n') + '\n';
+    }
+    if (objectNeighborhood && objectNeighborhood.length > 0) {
+      neighborhoodContext += `\nExisting ground-truth connections involving Object "${obj}" in the original graph:\n` +
+        objectNeighborhood.map((t: any) => `- (${t.sub}, ${t.rel}, ${t.obj})`).join('\n') + '\n';
+    }
+
+    let modelMathContext = '';
+    const mt = (modelType || 'TransE').toLowerCase();
+    if (mt.includes('transe')) {
+      modelMathContext = `Model formulation is TransE (Translational Embeddings): f_r(h,t) = -||h + r - t||_2^2.
+      Scores range from negative infinity to 0. A score closer to 0 (lower distance) represents a higher-probability translational match (perfect alignment is 0).`;
+    } else if (mt.includes('distmult')) {
+      modelMathContext = `Model formulation is DistMult (Bilinear Diagonal): f_r(h,t) = <h, r, t>.
+      Scores are real values where higher positive numbers indicate stronger diagonal bilinear activation and semantic correlation.`;
+    } else if (mt.includes('complex')) {
+      modelMathContext = `Model formulation is ComplEx (Complex Bilinear): f_r(h,t) = Re(<h, r, t_bar>).
+      Scores are real values where higher positive numbers represent higher probability of the asymmetric relationship, captured via the Hermitian inner product in the complex plane.`;
+    } else if (mt.includes('rotate')) {
+      modelMathContext = `Model formulation is RotatE (Rotational Embeddings): f_r(h,t) = -||h o r - t||_2^2.
+      Entities and relations are represented in complex space, where relations rotate the head entity to align with the tail entity. Scores range from negative infinity to 0, where a score closer to 0 indicates excellent rotational alignment.`;
+    }
+
+    const systemInstruction = "You are an expert in Knowledge Graph Embeddings (KGE) and relational data science.";
     const prompt = `
-      A KGE model (${modelType}) has analyzed a knowledge graph and predicted a *hidden relationship* that was NOT present in the original dataset but has a high similarity score (${score.toFixed(4)}) and a normalized confidence of ${(confidence * 100).toFixed(1)}%.
+      A KGE model (${modelType}) has analyzed a knowledge graph and predicted a *hidden relationship* that was NOT present in the original dataset.
+      The model predicted this triple with a raw similarity score of ${score.toFixed(4)} and a normalized confidence of ${(confidence * 100).toFixed(1)}%.
+      
+      Mathematical scoring context for this specific embedding model:
+      ${modelMathContext}
       
       Here is the predicted relationship:
       Subject: "${sub}"
@@ -208,10 +238,11 @@ app.post('/api/gemini/interpret-relationship', async (req, res) => {
       Object: "${obj}"
       
       The dataset represents: ${datasetDescription || 'a custom domain knowledge graph'}.
+      ${neighborhoodContext}
       
       Tasks:
-      1. Explain *why* the embedding model likely inferred this hidden connection based on standard semantic patterns (e.g., transitivity, symmetry, composition, or homophily).
-      2. Interpret what this relationship means in the real world given the domain context. Is this a logical discovery (e.g., a hidden kinship link, drug target, or company synergy) or a potential anomaly?
+      1. Explain *why* the embedding model likely inferred this hidden connection based on standard semantic patterns (e.g., transitivity, symmetry, composition, or homophily). Frame your explanation with direct reference to any matching links or paths found in the provided local graph neighborhoods, and tie this explanation back to the KGE formulation described above (e.g., translational alignment, complex rotational rotation, or bilinear product).
+      2. Interpret what this relationship means in the real world given the domain and the surrounding local context. Is this a logical discovery (e.g., path completion, role symmetry, or multi-hop composition) or a potential anomaly? Frame this interpretation carefully, avoiding ungrounded speculative assumptions about the domain, and explicitly point to the specific existing neighbors in the graph that support your reasoning.
       3. Provide a brief (2-3 sentences) hypothesis that could be tested in the real world to confirm this relationship.
       
       Provide a highly polished, informative, and professional response in markdown format. Keep it concise (under 250 words). Do not use dry jargon; speak clearly and objectively.

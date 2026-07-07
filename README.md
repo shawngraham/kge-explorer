@@ -20,6 +20,8 @@ A **Knowledge Graph Embedding (KGE) Engine and Latent Space Explorer** running 1
 *   **Dynamic Clustering**: High-dimensional **K-Means Clustering** directly over latent embedding spaces to discover modularity and semantic sub-communities.
 *   **Optional LLM Interpretation**: Connect to **Gemini** (with automatic exponential backoff retry for transient high-demand limits) or point the dashboard to **local LLMs (Ollama)** to generate semantic synthesis and relationship analysis from latent vector patterns.
 
+**Warning** The embeddings, scores, and local neighborhoods *do* get passed to the LLM (if you choose to hit the 'explain' buttons), which - given the nature of LLMs - tries to construct something plausible out of it all in terms of translating between the math and the user. Better models give better results. It should be fairly well grounded in the data and the embeddings and so less likely to make crap up. But... yeah. I've run this locally with Qwen 3:4b and it gets really flakey. Gemini latest is usually pretty good. The LLMs do suggest ways of verifying what they spit out, and yeah absolutely: verify verify verify. Sometimes that's as easy as just going back to the knowledge graph itself and you can spot the issue.
+
 ---
 
 ## Mathematical Formulations

@@ -1,0 +1,6 @@
+{
+  "name": "Knowledge Graph Embedding Explorer",
+  "description": "An interactive explorer for Knowledge Graph Embedding (KGE) models (TransE, ComplEx, RotatE, DistMult) with real-time training, interactive 3D visualization, latent space discovery, and link prediction.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

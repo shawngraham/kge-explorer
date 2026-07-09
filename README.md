@@ -29,7 +29,7 @@ _A work in progress. Needs refactoring._
 
 Knowledge Graph Embeddings represent entities $e \in \mathcal{E}$ and relations $r \in \mathcal{R}$ as dense vectors (or complex representations) in a continuous low-dimensional vector space. The goal is to maximize a scoring function $f_r(h, t)$ for true triples $(h, r, t)$ and minimize it for corrupted negative samples.
 
-### 1. KGE Score Functions $f_r(h, t)$
+### 1. KGE Score Functions 
 
 #### **TransE (Translational Embeddings)**
 Models relations as translation vectors in real space. This model is best for simple, hierarchical relationships where you can think of the link between two things as a distance (e.g., "Cerveteri" + "is located in" = "Italy", "looter_a" + "worked_for" =  "middleman_1"). It struggles with "one-to-many" relationships eg, "Giacomo_Medici" + "consigned_materials_to" = "auction_house_a" and "auction_house_b" and "auction_house_c"

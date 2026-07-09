@@ -5,6 +5,7 @@ A **Knowledge Graph Embedding (KGE) Engine and Latent Space Explorer** running 1
 
 <img width="800"  alt="Screenshot 2026-07-07 at 3 39 00 PM" src="https://github.com/user-attachments/assets/3f1e4212-1879-49c4-8691-5d7763d37b8a" />
 
+_A work in progress. Needs refactoring._ 
 
 ---
 
@@ -31,29 +32,20 @@ Knowledge Graph Embeddings represent entities $e \in \mathcal{E}$ and relations 
 ### 1. KGE Score Functions $f_r(h, t)$
 
 #### **TransE (Translational Embeddings)**
-Models relations as translation vectors in real space $\mathbb{R}^d$:
-$$f_r(h, t) = -\|h + r - t\|_2^2$$
-*   *Interpretation*: If the relation holds, then the tail vector $t$ should be close to the head vector $h$ shifted by the relation vector $r$ ($h + r \approx t$).
-*   *Constraints*: Entity embeddings are projected onto the unit ball ($|e\|_2 \le 1$) after each gradient step to prevent the optimization from trivial scaling.
+Models relations as translation vectors in real space. This model is best for simple, hierarchical relationships where you can think of the link between two things as a distance (e.g., "Cerveteri" + "is located in" = "Italy", "looter_a" + "worked_for" =  "middleman_1"). It struggles with "one-to-many" relationships eg, "Giacomo_Medici" + "consigned_materials_to" = "auction_house_a" and "auction_house_b" and "auction_house_c"
+
 
 #### **DistMult (Bilinear Diagonal)**
-Models relations as diagonal matrices in real space $\mathbb{R}^d$:
-$$f_r(h, t) = \langle h, r, t \rangle = \sum_{i=1}^{d} h_i \cdot r_i \cdot t_i$$
-*   *Interpretation*: Captures symmetric pairwise interactions. It is a highly efficient baseline but limited to symmetric relational patterns due to commutative multiplication.
+Models relations as diagonal matrices in real space. This model is best for symmetric relationships where the direction of the arrow doesn't matter (e.g., "Person A is a friend of Person B"). Uses simple multiplication so the math is the same regardless of which entity comes first. Very fast but unable to tell the difference where the direction of the arrow does matter, ie "A is the client of B" does not mean "B is the client of A."
+
 
 #### **ComplEx (Complex Bilinear)**
-Extends entities and relations to the complex domain $\mathbb{C}^d$:
-$$f_r(h, t) = \text{Re}(\langle h, r, \bar{t} \rangle) = \sum_{i=1}^{d} \text{Re}\left(h_i \cdot r_i \cdot \bar{t}_i\right)$$
-where $\bar{t}$ is the complex conjugate of $t$. Expanding the real and imaginary parts ($e = e_{\text{Re}} + i e_{\text{Im}}$) yields:
-$$f_r(h, t) = \sum_{i=1}^{d} \left(h_{i,\text{Re}}r_{i,\text{Re}}t_{i,\text{Re}} + h_{i,\text{Im}}r_{i,\text{Re}}t_{i,\text{Im}} + h_{i,\text{Re}}r_{i,\text{Im}}t_{i,\text{Im}} - h_{i,\text{Im}}r_{i,\text{Im}}t_{i,\text{Re}}\right)$$
-*   *Interpretation*: The asymmetry of the complex conjugate product allows ComplEx to naturally model asymmetric relational relations (e.g., $A \xrightarrow{\text{parent}} B$ does not imply $B \xrightarrow{\text{parent}} A$).
+This model is best for asymmetric or directed relationships where the order is crucial (e.g., "Smith", "was_patron_of", "MET"; the museum does not patronize the person!). By using complex numbers (which have both a "real" and "imaginary" part), it can mathematically distinguish between a relationship and its reverse, allowing it to model both symmetric and non-symmetric patterns effectively.
+
 
 #### **RotatE (Rotational Embeddings)**
-Models relations as rotation operations in complex space $\mathbb{C}^d$:
-$$f_r(h, t) = -\|h \circ r - t\|_2^2$$
-where each component $r_i$ is constrained to lie on the unit circle: $r_i = e^{i\theta_i} = \cos(\theta_i) + i\sin(\theta_i)$.
-*   *Interpretation*: The relation acts as a rotation of the head entity in the complex plane to align with the tail entity.
-*   *Representational Power*: Mathematically proven to capture symmetry, asymmetry, inversion (e.g., *hypernym* vs. *hyponym*), and composition relational patterns.
+
+This model is best for relational patterns like inversion and composition. An inversion means it 'understands' that if "Aidonia", "source_of", "Mycenaean_Gold", then it can predict "Mycenaean_Gold", "looted_from", "Aidonia". A composition means the model can follow a chain of logic.
 
 ---
 
